@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>AgriSense — Real-Time Environmental &amp; Crop Health Monitoring</title>
+  <link rel="stylesheet" href="style.css?v=2.6">
+</head>
+<body>
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🌾</span>
+      <div>
+        <h1>AgriSense</h1>
+        <p>Real-Time Environmental &amp; Crop Health Monitoring System</p>
+      </div>
+    </div>
+    <div class="controls no-print">
+      <label>📍 Farm Location
+        <select id="locationSelect"></select>
+      </label>
+      <label>🔎 Search any location on globe
+        <span class="search-box">
+          <input type="text" id="placeSearch" placeholder="e.g. Punjab, Japan, Brazil…" autocomplete="off">
+          <button id="searchBtn" type="button">Go</button>
+        </span>
+        <div id="searchResults" class="search-results hidden"></div>
+      </label>
+      <button id="geoBtn" title="Detect farm location via GPS - works anywhere in the world">🌍 GPS My Location</button>
+      <label>🌱 Crop
+        <select id="cropSelect"></select>
+      </label>
+      <button id="printBtn" title="Print / save this dashboard as PDF">🖨️ Print Report</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="errorBanner" class="error hidden"></div>
+
+    <!-- ===================== LIVE STATUS BAR ===================== -->
+    <section class="statusbar">
+      <span class="live-wrap"><span class="live-dot"></span> LIVE</span>
+      <span id="coordsTag" class="coords">📐 —</span>
+      <span id="zoneTag" class="zone-tag">🗺️ —</span>
+      <span id="weatherDesc" class="weather-desc">—</span>
+      <span class="spacer"></span>
+      <span class="countdown">next update in <strong id="countdown">60</strong>s</span>
+      <span>Last updated: <strong id="lastUpdated">—</strong></span>
+      <button id="refreshBtn" class="ghost-btn no-print">↻ Refresh</button>
+    </section>
+
+    <!-- ===================== 7-DAY FORECAST ===================== -->
+    <section class="panel">
+      <h2>🗓️ 7-Day Weather Forecast</h2>
+      <div class="forecast-strip" id="forecastStrip"></div>
+    </section>
+
+    <!-- ===================== CORE PARAMETER CARDS ===================== -->
+    <h3 class="section-sub">🛰️ Core sensor parameters <span>(virtual sensors - live from agro API)</span></h3>
+    <section class="cards">
+      <div class="card">
+        <div class="card-icon">🌡️</div>
+        <div class="card-label">Air Temperature</div>
+        <div class="card-value"><span id="tempVal">—</span> °C</div>
+        <div class="card-chip" id="tempChip">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💧</div>
+        <div class="card-label">Relative Humidity</div>
+        <div class="card-value"><span id="humVal">—</span> %</div>
+        <div class="card-chip" id="humChip">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌱</div>
+        <div class="card-label">Soil Moisture (topsoil)</div>
+        <div class="card-value"><span id="soilMVal">—</span> %</div>
+        <div class="card-chip" id="soilMChip">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🟤</div>
+        <div class="card-label">Soil Temperature</div>
+        <div class="card-value"><span id="soilTVal">—</span> °C</div>
+        <div class="card-chip" id="soilTChip">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌧️</div>
+        <div class="card-label">Rainfall (now / next 24h)</div>
+        <div class="card-value"><span id="rainVal">—</span> mm</div>
+        <div class="card-sub" id="rainSub">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">💨</div>
+        <div class="card-label">Wind Speed</div>
+        <div class="card-value"><span id="windVal">—</span> km/h</div>
+        <div class="card-chip" id="windChip">—</div>
+      </div>
+    </section>
+
+    <!-- ===================== ADVANCED AGRO PARAMETERS ===================== -->
+    <h3 class="section-sub">🧪 Advanced agro-meteorological parameters</h3>
+    <section class="cards">
+      <div class="card">
+        <div class="card-icon">☀️</div>
+        <div class="card-label">Evapotranspiration (ET₀, today)</div>
+        <div class="card-value"><span id="et0Val">—</span> mm/day</div>
+        <div class="card-sub">crop water use estimate</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🌫️</div>
+        <div class="card-label">Dew Point</div>
+        <div class="card-value"><span id="dewVal">—</span> °C</div>
+        <div class="card-sub">dew forms → leaf-wetness disease risk</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🍃</div>
+        <div class="card-label">VPD (vapour pressure deficit)</div>
+        <div class="card-value"><span id="vpdVal">—</span> kPa</div>
+        <div class="card-chip" id="vpdChip">—</div>
+      </div>
+      <div class="card">
+        <div class="card-icon">🔆</div>
+        <div class="card-label">Solar Radiation</div>
+        <div class="card-value"><span id="solarVal">—</span> W/m²</div>
+        <div class="card-sub">energy available for photosynthesis</div>
+      </div>
+    </section>
+
+    <!-- ===================== CROP HEALTH + ALERTS ===================== -->
+    <section class="grid-2">
+
+      <div class="panel">
+        <h2>🌿 Crop Health Assessment <span class="tag" id="cropNameTag">—</span></h2>
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 200 120" class="gauge">
+            <path d="M20 105 A85 85 0 0 1 180 105" class="gauge-bg"/>
+            <path id="gaugeFill" d="M20 105 A85 85 0 0 1 180 105" class="gauge-fill"/>
+          </svg>
+          <div class="gauge-center">
+            <div id="healthScore" class="score">—</div>
+            <div id="healthLabel" class="score-label">—</div>
+          </div>
+        </div>
+
+        <div class="ndvi">
+          <div class="ndvi-row">
+            <span>Estimated Vegetation Index (NDVI*)</span>
+            <strong id="ndviVal">—</strong>
+          </div>
+          <div class="ndvi-bar"><div id="ndviFill"></div></div>
+          <small>* estimated by software model from environmental parameters</small>
+        </div>
+
+        <h3 class="subhead">Parameter check against optimal range</h3>
+        <ul class="factors" id="factorList"></ul>
+      </div>
+
+      <div class="panel">
+        <h2>🔔 Real-Time Alerts &amp; Recommendations</h2>
+        <ul id="alerts" class="alerts"></ul>
+        <h3 class="subhead">Recent alert history (logged automatically)</h3>
+        <ul id="alertHistory" class="alert-history"></ul>
+      </div>
+
+    </section>
+
+    <!-- ===================== IRRIGATION + DISEASE RISK ===================== -->
+    <section class="grid-2">
+
+      <div class="panel irrigation">
+        <h2>💧 Smart Irrigation Advisory</h2>
+        <div class="irr-big">
+          <div>
+            <div class="irr-num"><span id="irrNeed">—</span> mm</div>
+            <div class="irr-sub">net water needed today ≈ <strong id="irrLiters">—</strong></div>
+          </div>
+          <span class="card-chip" id="irrChip">—</span>
+        </div>
+        <div class="kv">
+          <div class="kv-row"><span>Crop water use today (ET₀)</span><strong id="kvEt0">—</strong></div>
+          <div class="kv-row"><span>Rain expected (next 24 h credit)</span><strong id="kvRain">—</strong></div>
+          <div class="kv-row"><span>Soil moisture deficit</span><strong id="kvDeficit">—</strong></div>
+          <div class="kv-row total"><span>Net irrigation requirement</span><strong id="kvNet">—</strong></div>
+        </div>
+        <p class="note" id="irrVerdict">—</p>
+      </div>
+
+      <div class="panel">
+        <h2>🦠 Disease &amp; Pest Risk Index <span class="panel-sub">next 24 h forecast hours</span></h2>
+        <div class="risk-block">
+          <div class="risk-head"><span>🍄 Fungal disease risk (blight / mildew / rust)</span><strong id="riskFungalPct">—</strong></div>
+          <div class="ndvi-bar"><div id="riskFungalFill" class="risk-fill"></div></div>
+          <span class="card-chip" id="riskFungalLabel">—</span>
+        </div>
+        <div class="risk-block">
+          <div class="risk-head"><span>🐛 Pest activity risk (aphids / borers)</span><strong id="riskPestPct">—</strong></div>
+          <div class="ndvi-bar"><div id="riskPestFill" class="risk-fill"></div></div>
+          <span class="card-chip" id="riskPestLabel">—</span>
+        </div>
+        <p class="note" id="riskNote">—</p>
+      </div>
+
+    </section>
+
+    <!-- ===================== GROWTH TRACKER + LEAF ANALYZER ===================== -->
+    <section class="grid-2">
+
+      <div class="panel">
+        <h2>📅 Crop Growth Stage Tracker</h2>
+        <label class="field-label no-print">Sowing date:
+          <input type="date" id="sowDate" class="input">
+        </label>
+        <p class="note" id="growthSummary">Enter your sowing date above to track the crop stage.</p>
+        <div class="ndvi-bar growth-bar"><div id="growthFill"></div></div>
+        <ul id="stageList" class="stage-list"></ul>
+        <p class="note" id="harvestEta"></p>
+      </div>
+
+      <div class="panel">
+        <h2>🍃 Leaf Photo Health Analyzer <span class="tag">experimental</span></h2>
+        <p class="note">Upload a leaf photo — the system analyzes green / yellow / brown pixels
+        to estimate plant stress. (Color-based estimate, no ML model.)</p>
+        <div class="leaf-controls no-print">
+          <input type="file" id="leafFile" accept="image/*" class="input">
+        </div>
+        <div class="leaf-body">
+          <img id="leafPreview" class="leaf-preview hidden" alt="leaf preview">
+          <div id="leafResult" class="leaf-result hidden">
+            <div class="leaf-row"><span>✅ Healthy (green)</span><strong id="leafHealthyPct">—</strong></div>
+            <div class="ndvi-bar"><div id="leafHealthyBar" class="leaf-bar"></div></div>
+            <div class="leaf-row"><span>🟡 Yellowing (chlorosis)</span><strong id="leafYellowPct">—</strong></div>
+            <div class="ndvi-bar"><div id="leafYellowBar" class="leaf-bar"></div></div>
+            <div class="leaf-row"><span>🟤 Brown / dead tissue (necrosis)</span><strong id="leafBrownPct">—</strong></div>
+            <div class="ndvi-bar"><div id="leafBrownBar" class="leaf-bar"></div></div>
+            <p class="verdict" id="leafVerdict">—</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ===================== DATA LOG + EXPORT ===================== -->
+    <section class="panel">
+      <h2>📊 Data Logging &amp; Export</h2>
+      <div class="hist-row">
+        <span>🗄️ Readings logged: <strong id="histCount">0</strong></span>
+        <span>🕐 Logging since: <strong id="histSince">—</strong></span>
+        <span class="spacer"></span>
+        <button id="csvBtn" class="ghost-btn no-print">⬇️ Export CSV</button>
+        <button id="clearHistBtn" class="ghost-btn danger no-print">🗑️ Clear log</button>
+      </div>
+      <p class="note">Every refresh saves a snapshot (time, temperature, humidity, soil moisture, soil temp, health score, NDVI)
+      in the browser. Export it as CSV for Excel / analysis / attaching to your project report.</p>
+    </section>
+
+    <!-- ===================== CHARTS ===================== -->
+    <section class="panel">
+      <h2>📈 Air Temperature &amp; Humidity <span class="panel-sub">past 24 h (solid) &amp; next 24 h forecast (dashed)</span></h2>
+      <div class="chart-box"><canvas id="tempChart"></canvas></div>
+    </section>
+
+    <section class="panel">
+      <h2>💧 Soil Moisture &amp; Rainfall <span class="panel-sub">past 24 h (solid) &amp; next 24 h forecast (dashed)</span></h2>
+      <div class="chart-box"><canvas id="soilChart"></canvas></div>
+    </section>
+
+    <footer class="footer">
+      Real-time data: <strong>Open-Meteo</strong> agro-meteorological API (satellite + weather-model data, free &amp; keyless).
+      Crop Health Score, NDVI, irrigation advisory and risk indices are computed in software.
+      <br>In a hardware deployment, the API layer is simply replaced by field sensors (DHT22, soil-moisture probe) — the rest of the pipeline stays identical.
+      <br><strong>AgriSense v2.6</strong> — auto-detects climate zone &amp; regional crops for any farm on Earth 🌍
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="app.js?v=2.6"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a5217e6a0a06cd07',t:'MTc5MzI2OTcxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
